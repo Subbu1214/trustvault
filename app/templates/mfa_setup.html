@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Two-Factor Authentication · TrustVault{% endblock %}
+{% block body %}
+<h1>Two-Factor Authentication (TOTP)</h1>
+<p class="sub">Add an extra layer of security using Google Authenticator, Authy, 1Password, or any standard TOTP app.</p>
+
+{% if error %}
+  <div class="alert-box error" style="margin-bottom: 1.5rem; max-width: 650px;">{{ error }}</div>
+{% endif %}
+{% if success %}
+  <div class="alert-box success" style="margin-bottom: 1.5rem; max-width: 650px;">{{ success }}</div>
+{% endif %}
+
+{% if already_enabled %}
+  {% if enrolled_just_now %}
+    <div class="card" style="max-width: 650px; border-color: rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.05); margin-bottom: 2rem;">
+      <h3 style="color: var(--emerald-green); margin-bottom: 0.75rem;">Save Your Single-Use Recovery Codes</h3>
+      <p style="color: var(--text-white); font-size: 0.9rem; margin-bottom: 1rem;">
+        If you lose access to your authenticator app, these 10 backup codes are the <strong>only way</strong> to regain access to your account. Each code can only be used once. Store them in a secure password manager.
+      </p>
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.6rem; background: #060911; padding: 1rem; border-radius: 8px; border: 1px solid var(--border-subtle); font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: var(--cyan-top); margin-bottom: 1rem;">
+        {% for code in plain_codes %}
+          <div>{{ code }}</div>
+        {% endfor %}
+      </div>
+      <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0;">Notice: These codes will NOT be displayed again once you leave this page.</p>
+    </div>
+  {% endif %}
+
+  <div class="card" style="max-width: 650px; display: flex; flex-direction: column; gap: 1.25rem;">
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+      <div>
+        <h3 style="margin-bottom: 0.25rem;">Status: <span class="pill ok" style="margin-left: 0.5rem;">Enabled</span></h3>
+        <p class="sub" style="margin-bottom: 0;">Two-factor authentication is active. Every login and password reset requires a 6-digit TOTP code.</p>
+      </div>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid var(--border-subtle);">
+
+    <form method="post" action="{{ url_for('auth.mfa_disable_submit') }}" style="display: flex; flex-direction: column; gap: 1rem; background: transparent; padding: 0; border: none; box-shadow: none;">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <h4 style="color: var(--red-top);">Disable Two-Factor Authentication</h4>
+      <p class="sub" style="margin-bottom: 0.5rem; font-size: 0.85rem;">To disable MFA, confirm your current password and enter a valid authentication or recovery code.</p>
+      <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+        <label for="disable_password">Current Password</label>
+        <input id="disable_password" name="current_password" type="password" required placeholder="Enter current password">
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+        <label for="disable_code">Authenticator Code / Recovery Code</label>
+        <input id="disable_code" name="code" type="text" required placeholder="123456 or XXXX-XXXX">
+      </div>
+      <button class="btn2" type="submit" style="color: var(--red-top); border-color: var(--red-bevel); width: fit-content; margin-top: 0.5rem;">Disable 2FA</button>
+    </form>
+  </div>
+
+{% else %}
+  <div class="card" style="max-width: 650px; display: flex; flex-direction: column; gap: 1.5rem;">
+    <div>
+      <h3>Step 1: Scan QR Code with Authenticator App</h3>
+      <p class="sub" style="margin-bottom: 1rem;">Open your authenticator app (Google Authenticator, Authy, 1Password, etc.) and scan the QR code below:</p>
+      
+      <div style="display: flex; gap: 2rem; align-items: center; flex-wrap: wrap;">
+        <div style="background: white; padding: 0.75rem; border-radius: 12px; display: inline-block;">
+          <img src="{{ qr_data_uri }}" alt="MFA QR Code" width="180" height="180" style="display: block;">
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <span style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em;">Manual Key Entry</span>
+          <div style="margin-top: 0.25rem; font-family: 'JetBrains Mono', monospace; font-size: 1.1rem; color: var(--cyan-top); background: #060911; padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid var(--border-subtle); word-break: break-all;">
+            {{ secret }}
+          </div>
+          <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem; margin-bottom: 0;">Time-based (TOTP), 30-second interval, 6 digits.</p>
+        </div>
+      </div>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid var(--border-subtle);">
+
+    <div>
+      <h3>Step 2: Verify and Activate</h3>
+      <p class="sub" style="margin-bottom: 1rem;">Enter your current password and the 6-digit code shown in your app to activate MFA:</p>
+
+      <form method="post" action="{{ url_for('auth.mfa_setup_submit') }}" style="display: flex; flex-direction: column; gap: 1.25rem; background: transparent; padding: 0; border: none; box-shadow: none;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="enrollment_token" value="{{ enrollment_token }}">
+
+        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+          <label for="current_password">Current Password</label>
+          <input id="current_password" name="current_password" type="password" required autocomplete="current-password" placeholder="Confirm your password">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 0.4rem;">
+          <label for="code">6-Digit Authenticator Code</label>
+          <input id="code" name="code" type="text" required autocomplete="one-time-code" placeholder="123456" maxlength="6" style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0.2em; font-size: 1.1rem; max-width: 220px;">
+        </div>
+
+        <div style="margin-top: 0.5rem; display: flex; gap: 1rem; align-items: center;">
+          <button class="btn" type="submit">Activate 2FA</button>
+          <a href="{{ url_for('docs.list_docs') }}" class="btn2" style="text-decoration: none;">Cancel</a>
+        </div>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
